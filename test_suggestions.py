@@ -472,10 +472,10 @@ class TestExportSuggestions(unittest.TestCase):
         try:
             ws = openpyxl.load_workbook(path)["Platform Suggestions"]
             headers = [c.value for c in ws[1]]
-            for expected in ("Page Name", "Parent Section", "Primary Audience",
-                             "Overall Content Health", "Duplication Status",
-                             "Recommended Treatment", "AI/Search Readiness",
-                             "Priority", "Questions for Content Owner", "Status"):
+            for expected in ("Page Name", "Primary Audience", "Content Purpose",
+                             "Overall Content Health", "Content Health Notes",
+                             "Improvement Opportunities", "Recommended Platform",
+                             "Key Recommendation", "Questions for Content Owner", "Status"):
                 self.assertIn(expected, headers, msg=expected)
         finally:
             path.unlink(missing_ok=True)
@@ -488,12 +488,37 @@ class TestExportSuggestions(unittest.TestCase):
         try:
             ws = openpyxl.load_workbook(path)["Platform Suggestions"]
             row = dict(zip([c.value for c in ws[1]], [c.value for c in ws[2]]))
-            self.assertEqual(row["Current Platform Fit"], "Reconsider")
-            self.assertEqual(row["Outdated Content Flag"], "Yes")
             self.assertEqual(row["Overall Content Health"], "Significant Concern")
             self.assertEqual(row["Status"], None)
         finally:
             path.unlink(missing_ok=True)
+
+    def test_redundant_columns_are_not_exported(self):
+        """Columns the content team flagged as duplicating other columns are gone."""
+        import openpyxl
+        path = self.app.export_suggestions([self._result()], "https://mankato.mnsu.edu/a/")
+        try:
+            headers = [c.value for c in openpyxl.load_workbook(path)["Platform Suggestions"][1]]
+            for gone in ("Parent Section", "Current Platform", "Current Platform Fit",
+                         "Outdated Content Flag", "Conflicting Content Flag",
+                         "Major Issues Identified", "Recommendation Confidence",
+                         "What Would Raise Confidence", "Secondary User Need",
+                         "Duplication Status", "Related/Duplicate URLs",
+                         "Recommended Treatment", "AI/Search Readiness", "Priority"):
+                self.assertNotIn(gone, headers, msg=gone)
+        finally:
+            path.unlink(missing_ok=True)
+
+    def test_derived_fields_still_computed_for_the_ui(self):
+        """Dropping the columns must not stop the values reaching the live table."""
+        derived = self.app.derive_computed_fields(
+            "https://mankato.mnsu.edu/a/b/",
+            {"recommended_treatment": "ARCHIVE / REMOVE REVIEW",
+             "health_accuracy_currency": "Significant Concern",
+             "duplication_status": "Conflicting content detected"})
+        self.assertEqual(derived["current_platform_fit"], "Reconsider")
+        self.assertTrue(derived["outdated_content_flag"])
+        self.assertTrue(derived["conflicting_content_flag"])
 
 
 if __name__ == "__main__":

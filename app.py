@@ -1320,7 +1320,6 @@ def export_suggestions(results: list[dict], start_url: str) -> Path:
         "Teams / SharePoint":  "CCFBF1",   # teal-100
         "No Clear Fit":        "F3F4F6",   # gray-100
     }
-    CONFIDENCE_COLORS = {"High": "16A34A", "Medium": "D97706", "Low": "DC2626"}
 
     def _yes_no(value) -> str:
         return "Yes" if value else "No"
@@ -1336,14 +1335,11 @@ def export_suggestions(results: list[dict], start_url: str) -> Path:
         ("#",                             lambda r: r["index"],                              5,  False),
         ("Page Name",                     lambda r: r.get("page_name", ""),                  28, False),
         ("Full URL",                      lambda r: r.get("url", ""),                        50, True),
-        ("Parent Section",                lambda r: r.get("parent_section", ""),             30, True),
-        ("Current Platform",              lambda r: r.get("current_platform", "Website"),    18, False),
         ("Page Summary",                  lambda r: r.get("page_summary", ""),               50, True),
         # Audience and purpose
         ("Primary Audience",              lambda r: r.get("primary_audience", ""),           20, False),
         ("Secondary Audience",            lambda r: r.get("secondary_audience", ""),         20, False),
         ("Primary User Need",             lambda r: r.get("primary_user_need", ""),          16, False),
-        ("Secondary User Need",           lambda r: r.get("secondary_user_need", ""),        16, False),
         ("Content Purpose",               lambda r: r.get("content_purpose", ""),            22, False),
         ("Purpose Explanation",           lambda r: r.get("purpose_explanation", ""),        40, True),
         # Content health
@@ -1356,22 +1352,11 @@ def export_suggestions(results: list[dict], start_url: str) -> Path:
         ("Overall Content Health",        lambda r: r.get("overall_content_health", ""),     20, False),
         ("Content Health Notes",          lambda r: r.get("health_notes", ""),               50, True),
         # Content issues
-        ("Outdated Content Flag",         lambda r: _yes_no(r.get("outdated_content_flag")), 16, False),
-        ("Duplication Status",            lambda r: r.get("duplication_status", ""),         24, False),
-        ("Related/Duplicate URLs",        lambda r: _joined(r.get("related_urls")),          45, True),
-        ("Conflicting Content Flag",      lambda r: _yes_no(r.get("conflicting_content_flag")), 16, False),
-        ("Major Issues Identified",       lambda r: r.get("major_issues", ""),               50, True),
         ("Improvement Opportunities",     lambda r: _joined(r.get("improvement_opportunities")), 45, True),
         # Strategy
-        ("Current Platform Fit",          lambda r: r.get("current_platform_fit", ""),       18, False),
-        ("Recommended Treatment",         lambda r: r.get("recommended_treatment", ""),      22, False),
         ("Recommended Platform",          lambda r: r.get("platform", ""),                   22, False),
         ("Platform Rationale",            lambda r: r.get("reason", ""),                     50, True),
-        ("AI/Search Readiness",           lambda r: r.get("ai_search_readiness", ""),        18, False),
         # Project planning
-        ("Priority",                      lambda r: r.get("priority", ""),                   24, False),
-        ("Recommendation Confidence",     lambda r: r.get("confidence", ""),                 16, False),
-        ("What Would Raise Confidence",   lambda r: r.get("confidence_gap", ""),             40, True),
         ("Key Recommendation",            lambda r: r.get("key_recommendation", ""),         50, True),
         ("Questions for Content Owner",   lambda r: _joined(r.get("content_owner_questions")), 45, True),
         ("Content Owner",                 lambda r: "",                                      20, False),
@@ -1388,19 +1373,14 @@ def export_suggestions(results: list[dict], start_url: str) -> Path:
         cell.border = border
     ws.row_dimensions[1].height = 22
 
-    confidence_col = next(i for i, c in enumerate(COLUMNS, 1) if c[0] == "Recommendation Confidence")
-
     for r in results:
         row_num = r["index"] + 1
         row_fill = PatternFill("solid", fgColor=PLATFORM_COLORS.get(r.get("platform", ""), "F3F4F6"))
-        conf_font = Font(color=CONFIDENCE_COLORS.get(r.get("confidence", ""), "374151"), bold=True)
         for col, (_header, getter, _width, wrap_text) in enumerate(COLUMNS, 1):
             cell = ws.cell(row=row_num, column=col, value=getter(r))
             cell.fill = row_fill
             cell.border = border
             cell.alignment = wrap if wrap_text else center
-            if col == confidence_col:
-                cell.font = conf_font
 
     for col, (_header, _getter, width, _wrap) in enumerate(COLUMNS, 1):
         ws.column_dimensions[get_column_letter(col)].width = width
