@@ -137,6 +137,27 @@ class TestProgressReconnect(unittest.TestCase):
             q.get()
         return q
 
+    def test_live_analysis_stream_closes_after_completion(self):
+        """A finished analysis ends its stream instead of heartbeating until the
+        connection drops, which is what sent reconnecting pages a second copy."""
+        import json
+        self.app.SSE_HEARTBEAT_SECONDS = 0.05
+        job_id = "test-live-analysis-close"
+        q = self.queue.Queue()
+        self.assertTrue(self.app.register_job(job_id, {"type": "analysis", "queue": q}))
+        try:
+            q.put({"type": "analysis_complete", "total": 0})
+            types = []
+            for chunk in self.client.get(f"/progress/{job_id}").response:
+                for raw in chunk.decode("utf-8", "ignore").split("\n\n"):
+                    if raw.startswith("data: "):
+                        types.append(json.loads(raw[6:])["type"])
+                if len(types) >= 3:      # a stream that never ends would heartbeat forever
+                    break
+            self.assertEqual(types, ["analysis_complete"])
+        finally:
+            self.app.finish_job(job_id)
+
     def test_reconnect_replays_completion_instead_of_heartbeats(self):
         job_id = "test-reconnect-download"
         self._finished_job(job_id, {"type": "download", "zip_path": "x.zip"}, {"type": "complete"})
@@ -520,6 +541,20 @@ class TestExportSuggestions(unittest.TestCase):
         self.assertTrue(derived["outdated_content_flag"])
         self.assertTrue(derived["conflicting_content_flag"])
 
+
+    def test_duplicate_results_counted_once(self):
+        """A page that reconnected mid-run holds each result twice; the export
+        must still count each page once."""
+        import openpyxl
+        rows = [self._result(index=i, url=f"https://mankato.mnsu.edu/a/{i}/") for i in (1, 2, 3)]
+        replayed = rows + [{"type": "analysis_placeholder", **r} for r in rows]
+        path = self.app.export_suggestions(replayed, "https://mankato.mnsu.edu/a/")
+        try:
+            wb = openpyxl.load_workbook(path)
+            self.assertEqual(wb["Platform Suggestions"].max_row, 4)   # header + 3 pages
+            self.assertEqual(wb["Summary"]["B2"].value, 3)
+        finally:
+            path.unlink(missing_ok=True)
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -1300,6 +1300,9 @@ def _analysis_worker(job_id: str, links: list[dict], q: queue.Queue) -> None:
 
 def export_suggestions(results: list[dict], start_url: str) -> Path:
     """Build an Excel workbook from platform suggestion results."""
+    # A page that reconnected mid-run may hold two copies of each result; keep
+    # one per page so the Summary counts match the rows.
+    results = list({r["index"]: r for r in results}.values())
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Platform Suggestions"
@@ -1529,7 +1532,7 @@ def progress(job_id: str):
                 if evt.get("type") == "complete" and job.get("type") == "scrape":
                     job["links"] = evt.get("links", [])
                 yield f"data: {json.dumps(evt)}\n\n"
-                if evt.get("type") in ("complete", "fatal", "cancelled"):
+                if evt.get("type") in ("complete", "analysis_complete", "fatal", "cancelled"):
                     job["finished_at"] = time.time()
                     break
             except queue.Empty:

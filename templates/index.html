@@ -683,7 +683,9 @@
         const evt = JSON.parse(e.data);
 
         // ── Instant placeholder row per URL ───────────────────────────────────
-        if (evt.type === 'analysis_placeholder') {
+        // A reconnect replays placeholders for rows the table already has; the
+        // analysis_upgrade right behind each one refreshes the existing row.
+        if (evt.type === 'analysis_placeholder' && !document.getElementById(`row-${evt.index}`)) {
           suggestionResults.push(evt);
           const tr = document.createElement('tr');
           tr.id = `row-${evt.index}`;
